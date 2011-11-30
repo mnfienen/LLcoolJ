@@ -1,0 +1,13 @@
+  0.145335  ROcoef 1
+  0.266213  ROcoef 2
+  0.026967  ROcoef 3
+  0.141759  ROcoef 4
+  0.021612  ROcoef 5
+  0.831588  ROcoef 6
+  0.000000  ROcoef 7
+  0.020000  Kv
+  0.200000  grad
+  0.800000  pan eval coef
+         3  # days moving average
+   1221.00  Area conductance trigger
+ 213.75700  Area conductance factor
