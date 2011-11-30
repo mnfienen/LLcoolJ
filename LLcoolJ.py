@@ -12,6 +12,7 @@ class hydrologic_budget:
         self.DA = DA
         self.SUM = 0.0 # sum of snowmelt
         self.LL_init = LL_init
+        
     # method to read in the namefile information
     def read_namefile(self):
         try:
@@ -20,7 +21,7 @@ class hydrologic_budget:
             self.datfilename = indat.pop(0).strip()
             self.calfilename = indat.pop(0).strip()
         except:
-            raise(FileFail(self.namfile),'NameFile')
+            raise(FileFail(self.namfile,'NameFile'))
     
     # method to read in Cal data
     def read_calfile(self):
@@ -36,10 +37,10 @@ class hydrologic_budget:
         if len(lines) != 13:
             raise(CalFail(len(lines),self.calfilename))
         # now pull out the ROcoeffs
-        self.ROcoefs = np.array(lines[0:7]).astype(float)
+        self.ROCOEF = np.array(lines[0:7]).astype(float)
         self.GWCOND = float(lines[7])
         self.GRAD = float(lines[8])
-        self.EVCOEFF = float(lines[9])
+        self.EVCOEF = float(lines[9])
         self.NMA = float(lines[10])
         self.ADCT = float(lines[11])
         self.ADCF = float(lines[12])
@@ -48,22 +49,22 @@ class hydrologic_budget:
 
     # method to read in time series data
     def read_datfile(self):
-       # try:
-        indat = np.genfromtxt(self.datfilename,names=True,dtype=None)
-        self.precip = indat['Precip']
-        self.PI = self.precip/12.0 # converted to feet 
-        self.evap = indat['Evap']
-        self.evap[self.evap==-999] = 0
-        self.dates = []
-        dates = indat['Date']
-        datefmt = '%m/%d/%Y' # format to read the dates as
-        for cd in dates:
-            self.dates.append(dt.strptime(cd,datefmt))
-        self.LL = np.zeros_like(self.evap)
-        self.LL[0] = self.LL_init
-        
-   #     except:
-   #         raise(FileFail(self.datfilename,'DatFile'))
+        try:
+            indat = np.genfromtxt(self.datfilename,names=True,dtype=None)
+            self.PRECIP = indat['Precip']
+            self.PI = self.PRECIP/12.0 # converted to feet 
+            self.EVAP = indat['Evap']
+            self.EVAP[self.EVAP==-999] = 0.0
+            self.DATES = []
+            DATES = indat['Date']
+            datefmt = '%m/%d/%Y' # format to read the dates as
+            for cd in DATES:
+                self.DATES.append(dt.strptime(cd,datefmt))
+            self.LL = np.zeros_like(self.EVAP)
+            self.LL[0] = self.LL_init
+            
+        except:
+            raise(FileFail(self.datfilename,'DatFile'))
         
 # ####################### #
 # Error Exception Classes #        
@@ -76,7 +77,8 @@ class FileFail(Exception):
     def __str__(self):
         return('\n\nCould not read ' + self.ft +': ' + self.filename + ' \n' +
             "You looking at me?!? It's your problem fool!\n" + 
-            "Either it can't be opened, can't be read, or doesn't exist")
+            "Either it can't be opened, can't be read, or doesn't exist") 
+    
 # -- wrong number of lines in cal file
 class CalFail(Exception):
     def __init__(self,nlines,fn):
