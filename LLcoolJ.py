@@ -18,20 +18,33 @@ class hydrologic_budget:
         
     def calc_next_lake_level(self):
         
-        self.DRYPPT = self.DRYPPT + self.DA
+        I = self.I
+        # Calculate lake area in square feet
+        self.AREA = -1890921920.41 + (1643379.95*self.LL[I])
+        
+        # Calculate precipitation in feet        
+        self.DRYPPT = self.DRYPPT + self.PI[I] * self.DA
 
         # Sum precipitation for snowmelt
         # fortran: SUM=SUM+PI(I)        
-        self.SUM = self.SUM + self.PI[self.I]
+        self.SUM = self.SUM + self.PI[I]
         
         # Calculate effective precipitation rate for runoff calculation
         # assuming 3-day moving average including current day        
-        start_index = max(0,self.I - self.NMA + 1)
-        end_index = self.I
-        self.SUMPPT = np.mean(self.PI[start_index:end_index])
+        start_index = max(0,I - self.NMA + 1)
+        end_index = I + 1
+        self.EFFPPT = np.mean(self.PI[start_index:end_index])
+
+        # Runoff for December, January, February, and mid-March
+        if ( (self.DATES[I].month in (12,1,2) ) or (self.DATES[I] == 3 and self.DATES[I] < 16) ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[7]
+            self.SUM = self.SUM - self.EFFPPT * self.ROCOEF[7]
+            
+#        elif (self.DATES[I] == 3 & self.DATES[I] < 16):
+        
         
         # advance to the next day
-        self.I += 1
+        I = I + 1
         
     # method to read in the namefile information
     def read_namefile(self):
@@ -82,6 +95,7 @@ class hydrologic_budget:
             for cd in DATES:
                 self.DATES.append(dt.strptime(cd,datefmt))
             self.LL = np.zeros_like(self.EVAP)
+            self.RO = np.zeros_like(self.EVAP)            
             self.LL[0] = self.LL_init
             
         except:
