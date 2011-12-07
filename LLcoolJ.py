@@ -16,6 +16,7 @@ class hydrologic_budget:
         self.LL_init = LL_init
         self.I = 0
         self.NMA = 3
+        self.dateout_fmt = "%m/%d/%Y" # see http://docs.python.org/library/datetime.html
 
     # method to read in the namefile information
     def read_namefile(self):
@@ -143,12 +144,9 @@ class hydrologic_budget:
         DVOL = FLOWIN - FLOWOT
         DSTAGE = DVOL / self.AREA
         self.LL[I+1] = self.LL[I] + DSTAGE            
-        
-        print '{0:02d}/{1:02d}/{2:4d}: {3:.3f}'.format(self.DATES[I].month,
-                                                       self.DATES[I].day,
-                                                       self.DATES[I].year,
-                                                       self.LL[I])
-        
+
+        outstring = dt.strftime(self.DATES[I],self.dateout_fmt) + ': {0:.3f}'.format(self.LL[I])
+        print outstring
         # advance to the next day
         self.I = self.I + 1
 
