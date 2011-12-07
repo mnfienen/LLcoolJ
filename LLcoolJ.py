@@ -10,9 +10,28 @@ class hydrologic_budget:
         # start out with just the property of the name file
         self.namfile = namfile
         self.DA = DA
+        self.DRYPPT = 0.0
         self.SUM = 0.0 # sum of snowmelt
         self.LL_init = LL_init
         self.I = 0
+        self.NMA = 3
+        
+    def calc_next_lake_level(self):
+        
+        self.DRYPPT = self.DRYPPT + self.DA
+
+        # Sum precipitation for snowmelt
+        # fortran: SUM=SUM+PI(I)        
+        self.SUM = self.SUM + self.PI[self.I]
+        
+        # Calculate effective precipitation rate for runoff calculation
+        # assuming 3-day moving average including current day        
+        start_index = max(0,self.I - self.NMA + 1)
+        end_index = self.I
+        self.SUMPPT = np.mean(self.PI[start_index:end_index])
+        
+        # advance to the next day
+        self.I += 1
         
     # method to read in the namefile information
     def read_namefile(self):
@@ -68,12 +87,6 @@ class hydrologic_budget:
         except:
             raise(FileFail(self.datfilename,'DatFile'))
 
-    def calc_next_lake_level(self):
-        # update lake area
-        self.AREA[self.I] = -1890921920.41 + (1643379.95 * self.LL[self.I])
-        # advance to the next day
-        self.I += 1
-        
         
 # ####################### #
 # Error Exception Classes #        
