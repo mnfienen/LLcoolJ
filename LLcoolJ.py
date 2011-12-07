@@ -12,6 +12,7 @@ class hydrologic_budget:
         self.DA = DA
         self.SUM = 0.0 # sum of snowmelt
         self.LL_init = LL_init
+        self.I = 0
         
     # method to read in the namefile information
     def read_namefile(self):
@@ -46,7 +47,7 @@ class hydrologic_budget:
         self.ADCF = float(lines[12])
         # now Calculate lake area at the Area-Dependent Conductance Trigger
         self.AAA=-1890921920.41+(1643379.95*self.ADCT)
-
+        
     # method to read in time series data
     def read_datfile(self):
         try:
@@ -54,7 +55,8 @@ class hydrologic_budget:
             self.PRECIP = indat['Precip']
             self.PI = self.PRECIP/12.0 # converted to feet 
             self.EVAP = indat['Evap']
-            self.EVAP[self.EVAP==-999] = 0.0
+            self.EVAP[self.EVAP < 0.0 ] = 0.0
+            self.E0 = self.EVAP / 12.0 * self.EVCOEF # calculate evaporation in feet
             self.DATES = []
             DATES = indat['Date']
             datefmt = '%m/%d/%Y' # format to read the dates as
@@ -65,6 +67,13 @@ class hydrologic_budget:
             
         except:
             raise(FileFail(self.datfilename,'DatFile'))
+
+    def calc_next_lake_level(self):
+        # update lake area
+        self.AREA[self.I] = -1890921920.41 + (1643379.95 * self.LL[self.I])
+        # advance to the next day
+        self.I += 1
+        
         
 # ####################### #
 # Error Exception Classes #        
