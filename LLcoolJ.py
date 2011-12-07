@@ -2,6 +2,7 @@
 # HYDROLOGIC BUDGET PROGRAM FOR SHELL LAKE, WISCONSIN
 
 import numpy as np
+import copy
 from datetime import datetime as dt # pull the datetime module from datetime and call it dt
 
 # initialize a class which will hold all properties and methods
@@ -10,10 +11,12 @@ class hydrologic_budget:
         # start out with just the property of the name file
         self.namfile = namfile
         self.DA = DA
+        self.DRYPPT = 0.0
         self.SUM = 0.0 # sum of snowmelt
         self.LL_init = LL_init
         self.I = 0
-        
+        self.NMA = 3
+
     # method to read in the namefile information
     def read_namefile(self):
         try:
@@ -56,24 +59,99 @@ class hydrologic_budget:
             self.PI = self.PRECIP/12.0 # converted to feet 
             self.EVAP = indat['Evap']
             self.EVAP[self.EVAP < 0.0 ] = 0.0
-            self.E0 = self.EVAP / 12.0 * self.EVCOEF # calculate evaporation in feet
+            self.EO = self.EVAP / 12.0 * self.EVCOEF # calculate evaporation in feet
             self.DATES = []
             DATES = indat['Date']
             datefmt = '%m/%d/%Y' # format to read the dates as
             for cd in DATES:
                 self.DATES.append(dt.strptime(cd,datefmt))
             self.LL = np.zeros_like(self.EVAP)
+            self.RO = np.zeros_like(self.EVAP)
+            self.GW = np.zeros_like(self.EVAP)            
             self.LL[0] = self.LL_init
             
         except:
             raise(FileFail(self.datfilename,'DatFile'))
 
+    # Method to calculate the current days' lake level
     def calc_next_lake_level(self):
-        # update lake area
-        self.AREA[self.I] = -1890921920.41 + (1643379.95 * self.LL[self.I])
-        # advance to the next day
-        self.I += 1
         
+        I = self.I
+        # Calculate lake area in square feet
+        self.AREA = -1890921920.41 + (1643379.95*self.LL[I])
+        
+        # Calculate precipitation in feet        
+        self.DRYPPT = self.DRYPPT + self.PI[I] * self.DA
+
+        # Sum precipitation for snowmelt
+        # fortran: SUM=SUM+PI(I)        
+        self.SUM = self.SUM + self.PI[I]
+        
+        # Calculate effective precipitation rate for runoff calculation
+        # assuming 3-day moving average including current day        
+        start_index = max(0,I - self.NMA + 1)
+        end_index = I + 1
+        self.EFFPPT = np.mean(self.PI[start_index:end_index])
+
+        # Runoff for December, January, February, and mid-March
+        if ( (self.DATES[I].month in (12, 1, 2) ) or (self.DATES[I] == 3 and self.DATES[I] < 16) ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[7]
+            self.SUM = self.SUM - self.EFFPPT * self.ROCOEF[7]
+            
+        # Runoff for latter half of March and April            
+        elif ( (self.DATES[I].month == 4 ) or (self.DATES[I] == 3 and self.DATES[I] >= 16) ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[1]
+        
+        # Runoff for May
+        elif (self.DATES[I].month == 5 ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[2]
+
+        # Runoff for June, July and August
+        elif (self.DATES[I].month in (6, 7, 8) ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[3]
+            
+        # Runoff for September and October
+        elif (self.DATES[I].month in (9, 10) ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[4]
+            
+        # Runoff for November
+        elif (self.DATES[I].month == 11 ):
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[5]
+
+        # If there's still snow on the 15th of March, assume that it all melts. TODAY.
+        if (self.DATES[I] == 3 and self.DATES[I] == 15):
+            # It would seem that  the original code discards any precip-related runoff
+            # perhaps this should read:
+            # self.RO[I] = self.RO(I) + self.SUM * self.DA * self.ROCOEF[6]            
+            self.RO[I] = self.SUM * self.DA * self.ROCOEF[6]
+            self.SUM = 0.0
+            
+        # Calculate ground-water flow from lake
+        self.GW[I] = self.GWCOND * self.GRAD
+        COND = copy.deepcopy(self.GWCOND)
+        if(self.LL[I] > self.ADCT):
+            self.FACT = self.LL[I] - self.ADCT
+            self.FACT = self.FACT * self.ADCF
+            self.FCOND = self.GWCOND + self.GWCOND * self.FACT
+            FAREA = self.AREA - self.AAA
+            COND = (self.AAA / self.AREA * self.GWCOND ) + (self.FAREA / self.AREA * self.FCOND)
+            self.GW[I] = COND * self.GRAD
+           
+        # Water balance and lake level calculations
+        FLOWIN = self.RO[I] + self.PI[I] * self.AREA
+        FLOWOT = self.EO[I] * self.AREA + self.GW[I] * self.AREA
+        DVOL = FLOWIN - FLOWOT
+        DSTAGE = DVOL / self.AREA
+        self.LL[I+1] = self.LL[I] + DSTAGE            
+        
+        print '{0:02d}/{1:02d}/{2:4d}: {3:.3f}'.format(self.DATES[I].month,
+                                                       self.DATES[I].day,
+                                                       self.DATES[I].year,
+                                                       self.LL[I])
+        
+        # advance to the next day
+        self.I = self.I + 1
+
         
 # ####################### #
 # Error Exception Classes #        

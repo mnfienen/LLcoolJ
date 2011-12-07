@@ -20,6 +20,6 @@ hbud.read_calfile()
 # read in and parse the Data File
 hbud.read_datfile()
 
-
+hbud.calc_next_lake_level()
 
 i=-1
