@@ -5,6 +5,9 @@ import numpy as np
 import copy
 from datetime import datetime as dt # pull the datetime module from datetime and call it dt
 
+def idx(fortran_index):
+    return fortran_index - 1
+
 # initialize a class which will hold all properties and methods
 class hydrologic_budget:
     def __init__(self,namfile,DA,LL_init):
@@ -26,8 +29,22 @@ class hydrologic_budget:
             self.datfilename = indat.pop(0).strip()
             self.calfilename = indat.pop(0).strip()
         except:
-            raise(FileFail(self.namfile,'NameFile'))
-    
+            raise(FileFail(self.namfile,'name (*.NAM) file'))
+
+    # method to open the output file
+    def open_outputfile(self):
+        try:
+            self.output_file = open(self.outfilename,'w')
+        except:
+            raise(FileFail(self.outfilename,'output file'))
+
+    # method to close the output file
+    def close_outputfile(self):
+        try:
+            self.output_file.close()
+        except:
+            raise(FileFail(self.outfilename,'output file'))
+        
     # method to read in Cal data
     def read_calfile(self):
         try:
@@ -66,16 +83,17 @@ class hydrologic_budget:
             datefmt = '%m/%d/%Y' # format to read the dates as
             for cd in DATES:
                 self.DATES.append(dt.strptime(cd,datefmt))
-            self.LL = np.zeros_like(self.EVAP)
+            self.LL = np.zeros(self.EVAP.size + 1)      
             self.RO = np.zeros_like(self.EVAP)
             self.GW = np.zeros_like(self.EVAP)            
             self.LL[0] = self.LL_init
+            self.NumRecs = self.EVAP.size
             
         except:
             raise(FileFail(self.datfilename,'DatFile'))
 
     # Method to calculate the current days' lake level
-    def calc_next_lake_level(self):
+    def calc_next_lake_level(self, echo=True):
         
         I = self.I
         # Calculate lake area in square feet
@@ -96,35 +114,35 @@ class hydrologic_budget:
 
         # Runoff for December, January, February, and mid-March
         if ( (self.DATES[I].month in (12, 1, 2) ) or (self.DATES[I] == 3 and self.DATES[I] < 16) ):
-            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[7]
-            self.SUM = self.SUM - self.EFFPPT * self.ROCOEF[7]
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(7)]
+            self.SUM = self.SUM - self.EFFPPT * self.ROCOEF[idx(7)]
             
         # Runoff for latter half of March and April            
         elif ( (self.DATES[I].month == 4 ) or (self.DATES[I] == 3 and self.DATES[I] >= 16) ):
-            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[1]
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(1)]
         
         # Runoff for May
         elif (self.DATES[I].month == 5 ):
-            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[2]
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(2)]
 
         # Runoff for June, July and August
         elif (self.DATES[I].month in (6, 7, 8) ):
-            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[3]
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(3)]
             
         # Runoff for September and October
         elif (self.DATES[I].month in (9, 10) ):
-            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[4]
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(4)]
             
         # Runoff for November
         elif (self.DATES[I].month == 11 ):
-            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[5]
+            self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(5)]
 
         # If there's still snow on the 15th of March, assume that it all melts. TODAY.
         if (self.DATES[I] == 3 and self.DATES[I] == 15):
             # It would seem that  the original code discards any precip-related runoff
             # perhaps this should read:
             # self.RO[I] = self.RO(I) + self.SUM * self.DA * self.ROCOEF[6]            
-            self.RO[I] = self.SUM * self.DA * self.ROCOEF[6]
+            self.RO[I] = self.SUM * self.DA * self.ROCOEF[idx(6)]
             self.SUM = 0.0
             
         # Calculate ground-water flow from lake
@@ -145,24 +163,33 @@ class hydrologic_budget:
         DSTAGE = DVOL / self.AREA
         self.LL[I+1] = self.LL[I] + DSTAGE            
 
-        outstring = dt.strftime(self.DATES[I],self.dateout_fmt) + ': {0:.3f}'.format(self.LL[I])
-        print outstring
+        # format output for writing to disk and screen
+        outstring = dt.strftime(self.DATES[I],self.dateout_fmt) + ': {0:.3f}'.format(self.LL[I])        
+        
+        if (echo):
+            print outstring
+
+        self.output_file.write(outstring)
+
         # advance to the next day
         self.I = self.I + 1
 
-        
+    def calc_lake_levels(self, echo=False):
+        while(self.I < self.NumRecs):
+            self.calc_next_lake_level(echo)
+        self.close_outputfile()
+    
 # ####################### #
 # Error Exception Classes #        
 # ####################### #
-# -- cannot read file
+# -- cannot read/write/open/close file
 class FileFail(Exception):
     def __init__(self,filename,filetype):
         self.filename=filename
         self.ft = filetype
     def __str__(self):
-        return('\n\nCould not read ' + self.ft +': ' + self.filename + ' \n' +
-            "You looking at me?!? It's your problem fool!\n" + 
-            "Either it can't be opened, can't be read, or doesn't exist") 
+        return('\n\nProblem with ' + self.ft +': ' + self.filename + ' \n' +
+            "Either it can't be opened or closed, can't be read from or written to, or doesn't exist") 
     
 # -- wrong number of lines in cal file
 class CalFail(Exception):
