@@ -108,17 +108,17 @@ class hydrologic_budget:
         
         # Calculate effective precipitation rate for runoff calculation
         # assuming 3-day moving average including current day        
-        start_index = max(0,I - self.NMA + 1)
+        start_index = int(max(0,I - self.NMA + 1))
         end_index = I + 1
         self.EFFPPT = np.mean(self.PI[start_index:end_index])
 
         # Runoff for December, January, February, and mid-March
-        if ( (self.DATES[I].month in (12, 1, 2) ) or (self.DATES[I] == 3 and self.DATES[I] < 16) ):
+        if ( (self.DATES[I].month in (12, 1, 2) ) or (self.DATES[I].month == 3 and self.DATES[I].day < 16) ):
             self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(7)]
             self.SUM = self.SUM - self.EFFPPT * self.ROCOEF[idx(7)]
             
         # Runoff for latter half of March and April            
-        elif ( (self.DATES[I].month == 4 ) or (self.DATES[I] == 3 and self.DATES[I] >= 16) ):
+        elif ( (self.DATES[I].month == 4 ) or (self.DATES[I].month == 3 and self.DATES[I].day > 15) ):
             self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(1)]
         
         # Runoff for May
@@ -138,11 +138,16 @@ class hydrologic_budget:
             self.RO[I] = self.EFFPPT * self.DA * self.ROCOEF[idx(5)]
 
         # If there's still snow on the 15th of March, assume that it all melts. TODAY.
-        if (self.DATES[I] == 3 and self.DATES[I] == 15):
+        if (self.DATES[I].month == 3 and self.DATES[I].day == 15):
             # It would seem that  the original code discards any precip-related runoff
             # perhaps this should read:
             # self.RO[I] = self.RO(I) + self.SUM * self.DA * self.ROCOEF[6]            
             self.RO[I] = self.SUM * self.DA * self.ROCOEF[idx(6)]
+            RO = self.RO[I]
+            n = 0.
+
+        # reset snow amount accumulator on November 30
+        if (self.DATES[I].month == 11 and self.DATES[I].day == 30):
             self.SUM = 0.0
             
         # Calculate ground-water flow from lake
@@ -153,7 +158,7 @@ class hydrologic_budget:
             self.FACT = self.FACT * self.ADCF
             self.FCOND = self.GWCOND + self.GWCOND * self.FACT
             FAREA = self.AREA - self.AAA
-            COND = (self.AAA / self.AREA * self.GWCOND ) + (self.FAREA / self.AREA * self.FCOND)
+            COND = ( (self.AAA / self.AREA )* self.GWCOND ) + ( (FAREA / self.AREA) * self.FCOND)
             self.GW[I] = COND * self.GRAD
            
         # Water balance and lake level calculations
