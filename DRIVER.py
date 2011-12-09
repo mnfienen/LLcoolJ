@@ -20,9 +20,13 @@ hbud.read_namefile()
 # read in and parse the Cal File
 hbud.read_calfile()
 
+# open output file
+hbud.open_outputfile()
+
 # read in and parse the Data File
 hbud.read_datfile()
 
+# the next block reads the Fortran output file for comparison purposes
 file = open('test.out')
 
 fdate = []
@@ -35,7 +39,14 @@ for line in file:
     mydate, myvalue =  re.split(r'\s\s+',line.strip())
     fdate.append(dt.strptime(mydate,datefmt))
     fvalue.append(myvalue)
+# end of block to read Fortran file output    
     
-hbud.calc_next_lake_level()
+hbud.calc_lake_levels()
+
+# begin block of code to produce Matplotlib plot
+plt.figure()
+plt.plot(fdate, fvalue, 'g', hbud.DATES, hbud.LL[0:-1], 'r', label=['Fortran','Python'])
+plt.legend( ('Fortran','Python'), loc='lower left')
+plt.show()
 
 i=-1

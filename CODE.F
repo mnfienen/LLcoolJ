@@ -242,7 +242,7 @@ C Write date and lake level
 C     
       DO 45 I=1,NND
       WRITE(13,21)MONTH(I),DAY(I),YEAR(I),LL(I)      
-   21 FORMAT (I2,'/',I2,'/',I4,2X,F8.2)
+   21 FORMAT (I2,'/',I2,'/',I4,2X,F12.4)
    45 CONTINUE
 C
 C Program end
